@@ -1,9 +1,15 @@
-use crate::ast::{Command, Redirection, Argument};
+use crate::ast::{Command, Redirection, Argument, SimpleCommand, Script};
 
 grammar;
 
-pub Commands: Vec<Box<Command>> = {
-    Semicolon<Command>
+Pipe<T>: Vec<T> = {
+    <mut v:(<T> PIPE)*> <e:T> => match e {
+        None=> v,
+        Some(e) => {
+            v.push(e);
+            v
+        }
+    }
 };
 
 Semicolon<T>: Vec<T> = {
@@ -16,11 +22,11 @@ Semicolon<T>: Vec<T> = {
     }
 }
 
-Command: Box<Command> = {
-    #[precedence(level = "2")] #[assoc(side="right")]
-    Command Redirection =>
-        Box::new(Command::Redirect(<>)),
+pub Commands: Script = {
+    Semicolon<Command> => Script(<>.into_iter().map(|c| *c).collect())
+};
 
+Command: Box<Command> = {
     #[precedence(level = "1")] #[assoc(side="left")]
     <l:Command> PIPE <r:Command> => Box::new(Command::Pipe(l, r)),
 
@@ -29,7 +35,7 @@ Command: Box<Command> = {
 };
 
 SimpleCommand: Box<Command> = {
-    Word ArgList => Box::new(Command::Simple(<>)),
+    Word ArgList Redirection* => Box::new(Command::Simple(SimpleCommand::new(<>))),
 };
 
 ArgList: Vec<Argument> = {
@@ -38,7 +44,6 @@ ArgList: Vec<Argument> = {
 
 Arg: Argument = {
     Word => Argument::Literal(<>),
-    QuotedString => Argument::Quoted(<>),
     Variable => Argument::Variable(<>),
 };
 
@@ -50,14 +55,15 @@ Redirection: Redirection = {
 
 Word: String = {
     r#"[^\s\";|><]+"# => String::from(<>),
+    <s:QuotedString> => String::from(&s[1..s.len()-1])
 };
 
 QuotedString: String = {
-    r#""[^"]*""# => String::from(&<>[1..<>.len() - 1]),
+    r#""[^"]*""# => String::from(<>),
 };
 
 Variable: String = {
-    "${" <Word> "}" => <>,
+    "$" <Word> => <>,
 };
 
 PIPE: () = { "|" }

@@ -4,7 +4,7 @@ mod parser {
 
 mod ast;
 mod executor;
-use executor::execute_command;
+use executor::execute_script;
 use std::io::{self, Write};
 
 fn main() {
@@ -25,11 +25,7 @@ fn main() {
         }
 
         match parser::CommandsParser::new().parse(input) {
-            Ok(commands) => {
-                for cmd in commands {
-                    execute_command(*cmd);
-                }
-            }
+            Ok(command) => execute_script(command),
             Err(lalrpop_util::ParseError::UnrecognizedToken { token, expected }) => {
                 eprintln!("Syntax error at {:?}, expected {:?}", token, expected);
             }
